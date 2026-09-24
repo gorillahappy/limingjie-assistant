@@ -3,6 +3,7 @@ package com.landosol.toolbox.labyrinth.debug
 import android.graphics.Bitmap
 import android.util.Log
 import com.landosol.toolbox.AppVersion
+import com.landosol.toolbox.BuildConfig
 import com.landosol.toolbox.automation.overlay.AutomationOverlayPresentation
 import com.landosol.toolbox.labyrinth.LabyrinthEntryRecognitionSessionState
 import com.landosol.toolbox.labyrinth.vision.LabyrinthEntryFrameResult
@@ -55,7 +56,14 @@ class LabyrinthDebugDashboardServer(
     private val recentStates = ArrayDeque<ByteArray>()
     private val latest = AtomicReference(
         Snapshot(
-            json = "{\"status\":\"waiting\"}".toByteArray(Charsets.UTF_8),
+            json = JSONObject().apply {
+                put("status", "waiting")
+                put("appVersion", AppVersion.name)
+                put("appVersionCode", AppVersion.code)
+                put("applicationId", BuildConfig.APPLICATION_ID)
+                put("dashboardPort", port)
+                put("message", "当前应用尚未发布识别帧；请确认已启动任务并授权屏幕捕获")
+            }.toString().toByteArray(Charsets.UTF_8),
             jpeg = null,
             frameVersion = 0L,
         ),
@@ -307,6 +315,7 @@ class LabyrinthDebugDashboardServer(
                 buildString {
                     appendLine("黎明界助手调试日志包")
                     appendLine("应用版本: ${AppVersion.label}")
+                    appendLine("应用包名: ${BuildConfig.APPLICATION_ID}")
                     appendLine("生成时间: ${System.currentTimeMillis()}")
                     appendLine("服务地址: http://$IPV4_LOOPBACK:$port/")
                     appendLine("state/latest.json: 下载瞬间的结构化识别状态")
@@ -388,6 +397,8 @@ class LabyrinthDebugDashboardServer(
     ): JSONObject = JSONObject().apply {
         put("appVersion", AppVersion.name)
         put("appVersionCode", AppVersion.code)
+        put("applicationId", BuildConfig.APPLICATION_ID)
+        put("dashboardPort", port)
         put("timestamp", nowMillis)
         put("frameVersion", frameVersion)
         // The stored JPEG is refreshed at most every JPEG_REFRESH_INTERVAL_MILLIS, so several
@@ -654,7 +665,7 @@ class LabyrinthDebugDashboardServer(
     private companion object {
         const val LOG_TAG = "LabyrinthDebugHttp"
         const val IPV4_LOOPBACK = "127.0.0.1"
-        const val DEFAULT_PORT = 8765
+        val DEFAULT_PORT = DebugDashboardEndpoint.port
         const val JPEG_QUALITY = 68
         const val JPEG_REFRESH_INTERVAL_MILLIS = 750L
         const val FRAME_ARCHIVE_WIDTH = 960
@@ -682,7 +693,7 @@ class LabyrinthDebugDashboardServer(
               </style>
             </head>
             <body>
-              <header><strong>黎明界实时分析</strong><span class="pill">${AppVersion.label}</span><span class="pill" id="status">等待数据</span><span class="pill" id="page">-</span><span class="muted" id="stamp"></span><a class="pill action" href="/logs.zip">下载日志 ZIP</a><a class="pill action" href="#" id="archiveToggle">逐帧归档：读取中</a></header>
+              <header><strong>黎明界实时分析</strong><span class="pill">${AppVersion.label}</span><span class="pill">${BuildConfig.APPLICATION_ID}</span><span class="pill" id="status">等待数据</span><span class="pill" id="page">-</span><span class="muted" id="stamp"></span><a class="pill action" href="/logs.zip">下载日志 ZIP</a><a class="pill action" href="#" id="archiveToggle">逐帧归档：读取中</a></header>
               <main class="grid">
                 <section class="card"><div class="frameWrap" id="frameWrap"><img id="frame" alt="latest frame"></div></section>
                 <section class="stack">

@@ -5,6 +5,7 @@ import com.landosol.toolbox.labyrinth.vision.LabyrinthEntryFrameProcessor
 import com.landosol.toolbox.labyrinth.vision.LabyrinthEntryPageState
 import com.landosol.toolbox.labyrinth.vision.ReferenceCoverMapper
 import com.landosol.toolbox.labyrinth.vision.ReferenceFitMapper
+import com.landosol.toolbox.labyrinth.vision.ReferenceAnchoredMapper
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -30,6 +31,10 @@ class LabyrinthFallbackTapsTest {
                             )
                             EntryReferenceMapping.FIT -> ReferenceFitMapper.map(
                                 frameWidth, frameHeight, definition.referenceSize, definition.referenceRect,
+                            )
+                            EntryReferenceMapping.ANCHORED -> ReferenceAnchoredMapper.map(
+                                frameWidth, frameHeight, definition.referenceSize, definition.referenceRect,
+                                definition.alignment,
                             )
                         } ?: return@any false
                         tapX in rect.left until rect.left + rect.width &&

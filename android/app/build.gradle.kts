@@ -16,11 +16,20 @@ android {
         // major*10000 + minor*100 + patch, so the code stays monotonic as the name moves.
         versionCode = 10015
         versionName = "1.0.15"
+        buildConfigField("int", "DEBUG_DASHBOARD_PORT", "8765")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
+        debug {
+            if (providers.gradleProperty("resolutionTest").orNull == "true") {
+                applicationIdSuffix = ".resolutiontest"
+                versionNameSuffix = "-resolution-test.6"
+                buildConfigField("int", "DEBUG_DASHBOARD_PORT", "8766")
+                resValue("string", "app_name", "黎明界助手·分辨率测试")
+            }
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(

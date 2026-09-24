@@ -1,5 +1,7 @@
 package com.landosol.toolbox.ui.labyrinth
 
+import com.landosol.toolbox.labyrinth.debug.DebugDashboardEndpoint
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -304,8 +306,8 @@ private fun SupportFooter(uriHandler: androidx.compose.ui.platform.UriHandler) {
         Text("黎明界助手 · 作者 wbero · 交流群 1065226139", style = MaterialTheme.typography.bodySmall)
         Text("测试版本，遇到异常请附上日志和复现步骤。", style = MaterialTheme.typography.bodySmall)
         ChoiceRow {
-            TextButton(onClick = { uriHandler.openUri("http://127.0.0.1:8765/") }) { Text("实时日志") }
-            TextButton(onClick = { uriHandler.openUri("http://127.0.0.1:8765/logs.zip") }) { Text("下载日志 ZIP") }
+            TextButton(onClick = { uriHandler.openUri(DebugDashboardEndpoint.baseUrl) }) { Text("实时日志") }
+            TextButton(onClick = { uriHandler.openUri(DebugDashboardEndpoint.logsUrl) }) { Text("下载日志 ZIP") }
         }
     }
 }
