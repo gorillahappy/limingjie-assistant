@@ -16,6 +16,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.runtime.LaunchedEffect
 import com.landosol.toolbox.AppVersion
+import com.landosol.toolbox.labyrinth.debug.DebugDashboardEndpoint
 import com.landosol.toolbox.labyrinth.LabyrinthRerollSettings
 import com.landosol.toolbox.labyrinth.rerollSettings
 import com.landosol.toolbox.labyrinth.labyrinthRerollStatusText
@@ -195,12 +196,12 @@ fun LabyrinthScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         TextButton(
-                            onClick = { uriHandler.openUri("http://127.0.0.1:8765/") },
+                            onClick = { uriHandler.openUri(DebugDashboardEndpoint.baseUrl) },
                         ) {
                             Text("打开实时日志控制台")
                         }
                         TextButton(
-                            onClick = { uriHandler.openUri("http://127.0.0.1:8765/logs.zip") },
+                            onClick = { uriHandler.openUri(DebugDashboardEndpoint.logsUrl) },
                         ) {
                             Text("下载日志 ZIP")
                         }

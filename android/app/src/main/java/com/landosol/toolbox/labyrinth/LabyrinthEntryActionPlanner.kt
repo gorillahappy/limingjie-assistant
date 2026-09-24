@@ -228,8 +228,10 @@ class LabyrinthEntryActionPlanner(
                 }
             }
 
+            LabyrinthEntryPageState.PRE_HOME_DATA_LOADING ->
+                LabyrinthEntryActionDecision.Wait("正在进行数据连接，等待加载完成")
+
             LabyrinthEntryPageState.GAME_LOADING_PROGRESS,
-            LabyrinthEntryPageState.PRE_HOME_DATA_LOADING,
             -> planPreAnnouncementClick(nowMillis, frameWidth, frameHeight, allowStartingPhase = true)
 
             LabyrinthEntryPageState.UNKNOWN ->

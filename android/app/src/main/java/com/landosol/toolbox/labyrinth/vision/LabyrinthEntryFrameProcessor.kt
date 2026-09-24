@@ -296,6 +296,7 @@ data class EntryReferenceRect(val x: Int, val y: Int, val width: Int, val height
 enum class EntryReferenceMapping {
     COVER,
     FIT,
+    ANCHORED,
 }
 
 data class EntryPixelRect(val left: Int, val top: Int, val width: Int, val height: Int) {
@@ -309,6 +310,9 @@ data class EntryAnchorDefinition(
     val referenceSize: EntryReferenceSize,
     val referenceRect: EntryReferenceRect,
     val mapping: EntryReferenceMapping = EntryReferenceMapping.COVER,
+    val alignment: EntryAlignment = EntryAlignment.CENTER,
+    /** Reference pixels; local search is opt-in, never applied to all page anchors. */
+    val searchRadius: Int = 0,
 )
 
 data class LabyrinthEntryTemplateSet(val values: Map<String, PixelImage>) {
@@ -482,12 +486,24 @@ class LabyrinthEntryFrameProcessor(
                             referenceSize = definition.referenceSize,
                             referenceRect = definition.referenceRect,
                         )
+                        EntryReferenceMapping.ANCHORED -> ReferenceAnchoredMapper.map(
+                            frame.width, frame.height, definition.referenceSize,
+                            definition.referenceRect, definition.alignment,
+                        )
                     }
                     mapped?.let { rect ->
-                        EntryAnchorMatch(
-                            score = matcher.score(frame, rect, template),
-                            rect = rect,
-                        )
+                        if (definition.searchRadius > 0) {
+                            val scale = minOf(
+                                frame.width.toDouble() / definition.referenceSize.width,
+                                frame.height.toDouble() / definition.referenceSize.height,
+                            )
+                            LocalEntryAnchorMatcher.match(
+                                frame, template, rect, matcher,
+                                (definition.searchRadius * scale).roundToInt().coerceIn(1, 64),
+                            )
+                        } else {
+                            EntryAnchorMatch(score = matcher.score(frame, rect, template), rect = rect)
+                        }
                     }
                 }.maxByOrNull(EntryAnchorMatch::score)
             }
@@ -700,23 +716,31 @@ class LabyrinthEntryFrameProcessor(
         fun wide(id: String, x: Int, y: Int, width: Int, height: Int) =
             EntryAnchorDefinition(id, WIDE_REFERENCE, EntryReferenceRect(x, y, width, height))
 
-        fun standard(id: String, x: Int, y: Int, width: Int, height: Int) =
+        fun standard(id: String, x: Int, y: Int, width: Int, height: Int, searchRadius: Int = 0) =
             EntryAnchorDefinition(
                 id,
                 STANDARD_REFERENCE,
                 EntryReferenceRect(x, y, width, height),
                 EntryReferenceMapping.FIT,
+                searchRadius = searchRadius,
             )
 
         val DEFINITIONS = listOf(
             wide(EntryAnchorId.TITLE_LOGO, 952, 754, 847, 323),
             wide(EntryAnchorId.TITLE_TAP_PROMPT, 1152, 1129, 478, 70),
-            standard(EntryAnchorId.TITLE_LOGO, 586, 644, 723, 276),
-            standard(EntryAnchorId.TITLE_TAP_PROMPT, 757, 965, 408, 59),
+            standard(EntryAnchorId.TITLE_LOGO, 586, 644, 723, 276, searchRadius = 4),
+            standard(EntryAnchorId.TITLE_TAP_PROMPT, 757, 965, 408, 59, searchRadius = 4),
             wide(EntryAnchorId.LOADING_NOTICE, 1089, 1118, 455, 43),
             standard(EntryAnchorId.LOADING_NOTICE_STANDARD, 704, 947, 410, 45),
             wide(EntryAnchorId.LOADING_PROGRESS, 897, 1160, 997, 35),
             wide(EntryAnchorId.DATA_CONNECTING, 2142, 55, 426, 65),
+            // The connection label follows the right edge, not the centred background crop.
+            // The legacy wide COVER rectangle extends to x=1967 on a 1920px frame.
+            EntryAnchorDefinition(
+                EntryAnchorId.DATA_CONNECTING, STANDARD_REFERENCE,
+                EntryReferenceRect(1504, 49, 361, 55), EntryReferenceMapping.ANCHORED,
+                EntryAlignment.TOP_RIGHT, searchRadius = 8,
+            ),
             wide(EntryAnchorId.LOADING_INDICATOR, 2194, 1115, 178, 72),
             wide(EntryAnchorId.ANNOUNCEMENT_HEADER, 311, 61, 2157, 175),
             wide(EntryAnchorId.ANNOUNCEMENT_CLOSE, 1162, 1059, 475, 132),
@@ -829,11 +853,13 @@ class LabyrinthEntryFrameProcessor(
             standard(EntryAnchorId.SESSION_DATE_CHANGE_CONFIRM, 753, 691, 415, 102),
             standard(EntryAnchorId.BATTLE_IN_PROGRESS_MENU_BUTTON, 1700, 36, 192, 50),
             standard(EntryAnchorId.BATTLE_RESULT_REWARD_BANNER, 700, 270, 540, 82),
-            standard(EntryAnchorId.BATTLE_RESULT_NEXT_BUTTON, 1452, 946, 388, 92),
+            // Live 1440p WIN frames scored .797 with fixed sampling (required .80).
+            // Refine alignment locally while retaining the strict result-page threshold.
+            standard(EntryAnchorId.BATTLE_RESULT_NEXT_BUTTON, 1452, 946, 388, 92, searchRadius = 4),
             // Current 1920x1080 client Boss settlement pages place the same "下一步" button
             // about 40 px left and 20 px lower, with a slightly wider frame. Keep both fixed
             // candidates instead of widening one ROI so the template is not distorted.
-            standard(EntryAnchorId.BATTLE_RESULT_NEXT_BUTTON, 1412, 966, 414, 92),
+            standard(EntryAnchorId.BATTLE_RESULT_NEXT_BUTTON, 1412, 966, 414, 92, searchRadius = 4),
             // Boss three-team WIN summary uses a visually different blue Next button from the
             // ordinary battle result. Keep a dedicated template/anchor instead of weakening the
             // generic result threshold.
@@ -931,6 +957,7 @@ class GradientTemplateMatcher(
     )
 
     private val cache = IdentityHashMap<PixelImage, TemplateStats>()
+    private val scaledTemplates = IdentityHashMap<PixelImage, LinkedHashMap<Long, PixelImage>>()
     private data class FrameStats(val frame: PixelImage, val lights: ByteArray, val gradients: ShortArray)
     private var preparedFrame: FrameStats? = null
     /**
@@ -967,6 +994,42 @@ class GradientTemplateMatcher(
     fun clearPreparedFrame() { preparedFrame = null }
     /** Whether [prepareFrame] has been called for exactly this frame and not cleared since. */
     fun hasPreparedFrame(frame: PixelImage): Boolean = preparedFrame?.frame === frame
+
+    /** Compare thin lettering at the same sampling scale on smaller screens. Opt-in only. */
+    internal fun scoreScaleAware(frame: PixelImage, rect: EntryPixelRect, template: PixelImage): Double {
+        val original = score(frame, rect, template)
+        if (rect.width >= template.width || rect.height >= template.height) return original
+        val key = (rect.width.toLong() shl 32) or rect.height.toLong()
+        val sizes = scaledTemplates.getOrPut(template) { LinkedHashMap(8, 0.75f, true) }
+        val scaled = sizes[key] ?: run {
+            val pixels = IntArray(rect.width * rect.height)
+            for (y in 0 until rect.height) for (x in 0 until rect.width) {
+                val sx = ((x + 0.5) * template.width / rect.width - 0.5).coerceIn(0.0, template.width - 1.0)
+                val sy = ((y + 0.5) * template.height / rect.height - 0.5).coerceIn(0.0, template.height - 1.0)
+                val x0 = sx.toInt(); val y0 = sy.toInt()
+                val x1 = (x0 + 1).coerceAtMost(template.width - 1)
+                val y1 = (y0 + 1).coerceAtMost(template.height - 1)
+                val fx = sx - x0; val fy = sy - y0
+                var color = 0
+                for (shift in intArrayOf(24, 16, 8, 0)) {
+                    fun channel(px: Int, py: Int) = (template[px, py] ushr shift) and 255
+                    val top = channel(x0, y0) * (1 - fx) + channel(x1, y0) * fx
+                    val bottom = channel(x0, y1) * (1 - fx) + channel(x1, y1) * fx
+                    color = color or ((top * (1 - fy) + bottom * fy + 0.5).toInt() shl shift)
+                }
+                pixels[y * rect.width + x] = color
+            }
+            PixelImage(rect.width, rect.height, pixels).also { resized ->
+                if (sizes.size >= 8) {
+                    val oldest = sizes.entries.iterator()
+                    cache.remove(oldest.next().value)
+                    oldest.remove()
+                }
+                sizes[key] = resized
+            }
+        }
+        return maxOf(original, score(frame, rect, scaled))
+    }
 
     fun score(
         frame: PixelImage,
