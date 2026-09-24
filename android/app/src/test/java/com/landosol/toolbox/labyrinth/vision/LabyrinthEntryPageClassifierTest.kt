@@ -7,6 +7,33 @@ import org.junit.Test
 class LabyrinthEntryPageClassifierTest {
     private val classifier = LabyrinthEntryPageClassifier()
 
+    @Test fun `strong character joined modal owns the visible map despite small score margin`() {
+        for (mapScore in listOf(0.9027125150761172, 0.99)) {
+            val result = classifier.classify(scores(
+                EntryAnchorId.JOINED_HEADER_STANDARD to 0.9581154721987861,
+                EntryAnchorId.JOINED_CLOSE_STANDARD to 0.9667412600030884,
+                EntryAnchorId.NODE_HEADER_STANDARD to mapScore,
+                EntryAnchorId.NODE_CHARACTERS_STANDARD to mapScore,
+                EntryAnchorId.NODE_RETURN_STANDARD to mapScore,
+            ))
+            assertEquals(LabyrinthEntryPageState.CHARACTER_JOINED, result.state)
+            assertEquals(0.9581154721987861, result.confidence, 0.000001)
+        }
+    }
+
+    @Test fun `weak or incomplete joined evidence cannot override the map`() {
+        for ((header, close) in listOf(0.79 to 0.99, 0.99 to 0.79, 0.0 to 0.99, 0.99 to 0.0)) {
+            val result = classifier.classify(scores(
+                EntryAnchorId.JOINED_HEADER_STANDARD to header,
+                EntryAnchorId.JOINED_CLOSE_STANDARD to close,
+                EntryAnchorId.NODE_HEADER_STANDARD to 0.91,
+                EntryAnchorId.NODE_CHARACTERS_STANDARD to 0.96,
+                EntryAnchorId.NODE_RETURN_STANDARD to 0.93,
+            ))
+            assertEquals(LabyrinthEntryPageState.NODE_SELECTION, result.state)
+        }
+    }
+
     @Test
     fun `battle in progress relies on the stable menu anchor only`() {
         val result = classifier.classify(

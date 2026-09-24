@@ -58,6 +58,13 @@ class LabyrinthEntryPageClassifier(
     }
 
     fun classify(anchorScores: LabyrinthAnchorScores): LabyrinthEntryPageObservation {
+        // The title remains visible during login; the bottom-right spinner is not always shown.
+        // Require both the title and a strong connection label to suppress title-page retries.
+        val titleConnectingScore = minimum(
+            anchorScores[EntryAnchorId.TITLE_LOGO],
+            anchorScores[EntryAnchorId.DATA_CONNECTING],
+        )
+        val titleIsConnecting = titleConnectingScore >= maxOf(minScore, 0.60)
         val shopDialogScore = maxOf(
             anchorScores[EntryAnchorId.SHOP_PURCHASE_CONFIRMATION_TITLE],
             anchorScores[EntryAnchorId.SHOP_PURCHASE_COMPLETE_TITLE],
@@ -139,7 +146,7 @@ class LabyrinthEntryPageClassifier(
             (1.0 - nodeHeaderScore).coerceIn(0.0, 1.0),
         )
         val stateScores = linkedMapOf(
-            LabyrinthEntryPageState.TITLE_WAITING_TAP to minimum(
+            LabyrinthEntryPageState.TITLE_WAITING_TAP to if (titleIsConnecting) 0.0 else minimum(
                 anchorScores[EntryAnchorId.TITLE_LOGO],
                 anchorScores[EntryAnchorId.TITLE_TAP_PROMPT],
             ),
@@ -151,9 +158,12 @@ class LabyrinthEntryPageClassifier(
                 ),
                 anchorScores[EntryAnchorId.LOADING_PROGRESS],
             ),
-            LabyrinthEntryPageState.PRE_HOME_DATA_LOADING to minimum(
-                anchorScores[EntryAnchorId.DATA_CONNECTING],
-                anchorScores[EntryAnchorId.LOADING_INDICATOR],
+            LabyrinthEntryPageState.PRE_HOME_DATA_LOADING to maxOf(
+                if (titleIsConnecting) titleConnectingScore else 0.0,
+                minimum(
+                    anchorScores[EntryAnchorId.DATA_CONNECTING],
+                    anchorScores[EntryAnchorId.LOADING_INDICATOR],
+                ),
             ),
             LabyrinthEntryPageState.HOME_ANNOUNCEMENT to minimum(
                 anchorScores[EntryAnchorId.ANNOUNCEMENT_HEADER],
@@ -322,6 +332,12 @@ class LabyrinthEntryPageClassifier(
         // reward popup read as UNKNOWN and the run never closed it). When every modal anchor is
         // strong, the modal owns the frame regardless of what is underneath.
         val itemRewardModalScore = stateScores.getValue(LabyrinthEntryPageState.ITEM_REWARD)
+        // Character acquisition also leaves the map visible behind a dimmed modal. In the
+        // 2026-09-24 live frame the modal scored .958 and the map .903, so the generic .08
+        // ambiguity margin incorrectly disabled its close button and the route timed out.
+        // Both the dedicated header and close button must be strong; a lone close button
+        // is shared by other dialogs and must never be enough to take ownership.
+        val characterJoinedModalScore = stateScores.getValue(LabyrinthEntryPageState.CHARACTER_JOINED)
         // The RESULT banner is a large, full-colour, one-of-a-kind crop: nothing else in the game
         // scores near 1.0 against it. The run-result page it announces is a modal over the map, so
         // the map's header and side controls stay visible underneath and score highly, exactly as
@@ -337,6 +353,11 @@ class LabyrinthEntryPageClassifier(
         // the whole recording without pressing 下一步.
         val runResultLogoScore = anchorScores[EntryAnchorId.RUN_RESULT_LOGO]
         val state = when {
+            characterJoinedModalScore >= maxOf(minScore, MODAL_OVERLAY_MIN_SCORE) && best.key in setOf(
+                LabyrinthEntryPageState.NODE_SELECTION,
+                LabyrinthEntryPageState.NODE_MAP_VIEW,
+                LabyrinthEntryPageState.CHARACTER_JOINED,
+            ) -> LabyrinthEntryPageState.CHARACTER_JOINED
             eventOverlayScore >= maxOf(minScore, EVENT_OVERLAY_MIN_SCORE) && best.key in setOf(
                 LabyrinthEntryPageState.NODE_SELECTION,
                 LabyrinthEntryPageState.NODE_MAP_VIEW,
