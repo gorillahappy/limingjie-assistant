@@ -743,8 +743,18 @@ class LabyrinthEntryFrameProcessor(
                 EntryAlignment.TOP_RIGHT, searchRadius = 8,
             ),
             wide(EntryAnchorId.LOADING_INDICATOR, 2194, 1115, 178, 72),
+            // The current 16:9 comic loading page places this footer near the bottom right.
+            // Keep the legacy candidate; require the separate connection label in the classifier.
+            EntryAnchorDefinition(
+                EntryAnchorId.LOADING_INDICATOR, STANDARD_REFERENCE,
+                EntryReferenceRect(1545, 952, 151, 66), EntryReferenceMapping.ANCHORED,
+                EntryAlignment.BOTTOM_RIGHT, searchRadius = 6,
+            ),
             wide(EntryAnchorId.ANNOUNCEMENT_HEADER, 311, 61, 2157, 175),
             wide(EntryAnchorId.ANNOUNCEMENT_CLOSE, 1162, 1059, 475, 132),
+            // Current notification title/tabs and close button on the standard game viewport.
+            standard(EntryAnchorId.ANNOUNCEMENT_HEADER, 26, 24, 1864, 151, searchRadius = 4),
+            standard(EntryAnchorId.ANNOUNCEMENT_CLOSE, 748, 902, 424, 110, searchRadius = 6),
             standard(EntryAnchorId.HOME_LEVEL, 40, 53, 99, 35),
             standard(EntryAnchorId.HOME_ADVENTURE, 1013, 940, 129, 134),
             wide(EntryAnchorId.HOME_LEVEL, 68, 62, 114, 40),

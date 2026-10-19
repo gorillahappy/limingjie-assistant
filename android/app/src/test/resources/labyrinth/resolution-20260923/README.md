@@ -1,5 +1,14 @@
 # Login resolution regression fixtures
 
+2026-10-18 user report, device log clock 2026-10-19:
+- `loading-comic-20261018.jpg`: native 2560x1440 last captured test.7 reset
+  frame, with both the top-right connection label and bottom-right loading text.
+  The old wide footer ROI failed, so the reset consumed 30 presentation clicks.
+- `home-notice-20261018.png`: user-supplied notification screenshot after reset
+  stopped. Used to check that the existing announcement close path remains valid.
+Neither image contains an account ID or credentials. Full diagnostic archives
+remain outside the repository. The comic/card content retains the publisher's rights.
+
 `win-next-20260924.jpg`: live test.3 2560x1440 WIN screen at route node 26/36.
 The original next-button score was below .80. Tests cover bounded alignment
 search at native size and scaled 720p/1080p; no account identifiers are visible.

@@ -84,6 +84,59 @@ class ResolutionEntryRegressionTest {
         }
     }
 
+    @Test fun `comic loading frame requires both connection and footer and never spends clicks`() {
+        val source = readImage(File(fixtures, "loading-comic-20261018.jpg"))
+        for ((w, h) in listOf(1280 to 720, 1920 to 1080, 2560 to 1440)) {
+            val frame = if (w == source.width && h == source.height) source else resize(source, w, h)
+            val result = processor().process(frame)
+            println("COMIC $w x $h page=${result.observation.state} connecting=${result.observation.anchorScores[EntryAnchorId.DATA_CONNECTING]} footer=${result.observation.anchorScores[EntryAnchorId.LOADING_INDICATOR]}")
+            assertEquals("$w x $h", LabyrinthEntryPageState.PRE_HOME_DATA_LOADING, result.observation.state)
+            assertTrue(result.observation.anchorScores[EntryAnchorId.LOADING_INDICATOR] >= 0.65)
+            val planner = LabyrinthEntryActionPlanner(LabyrinthEntryActionPlannerConfig(stableFrames = 1))
+            planner.start(0)
+            assertTrue(planner.decide(LabyrinthEntryPageState.TITLE_WAITING_TAP, w, h, 0) is LabyrinthEntryActionDecision.Execute)
+            for (now in 1000L..90000L step 1000L) {
+                assertTrue(planner.decide(result.observation.state, w, h, now,
+                    result.observation.anchorScores, result.anchorMatches) is LabyrinthEntryActionDecision.Wait)
+            }
+            // A slow load must neither use the click budget nor exhaust the presentation window.
+            assertTrue(planner.decide(LabyrinthEntryPageState.UNKNOWN, w, h, 91000L) is LabyrinthEntryActionDecision.Execute)
+            assertTrue(planner.decide(result.observation.state, w, h, 120001L) is LabyrinthEntryActionDecision.Stop)
+        }
+    }
+
+    @Test fun `reported notification remains closable after slow reset login`() {
+        val result = processor().process(readImage(File(fixtures, "home-notice-20261018.png")))
+        println("NOTICE page=${result.observation.state} header=${result.observation.anchorScores[EntryAnchorId.ANNOUNCEMENT_HEADER]} close=${result.observation.anchorScores[EntryAnchorId.ANNOUNCEMENT_CLOSE]}")
+        assertEquals(LabyrinthEntryPageState.HOME_ANNOUNCEMENT, result.observation.state)
+        val planner = LabyrinthEntryActionPlanner(LabyrinthEntryActionPlannerConfig(stableFrames = 1))
+        planner.start(0)
+        assertTrue(planner.decide(LabyrinthEntryPageState.TITLE_WAITING_TAP, result.frameWidth,
+            result.frameHeight, 0) is LabyrinthEntryActionDecision.Execute)
+        for (now in 1000L..90000L step 1000L) {
+            assertTrue(planner.decide(LabyrinthEntryPageState.PRE_HOME_DATA_LOADING,
+                result.frameWidth, result.frameHeight, now) is LabyrinthEntryActionDecision.Wait)
+        }
+        val action = planner.decide(result.observation.state, result.frameWidth, result.frameHeight,
+            100000L, result.observation.anchorScores, result.anchorMatches)
+        assertTrue(action is LabyrinthEntryActionDecision.Execute)
+        assertEquals(com.landosol.toolbox.labyrinth.LabyrinthEntryActionKind.CLOSE_ANNOUNCEMENT,
+            (action as LabyrinthEntryActionDecision.Execute).kind)
+    }
+
+    @Test fun `loading preserves click cap and cannot start clicks on an unknown page`() {
+        val planner = LabyrinthEntryActionPlanner(LabyrinthEntryActionPlannerConfig(stableFrames = 1, maxPreAnnouncementClicks = 2))
+        planner.start(0)
+        assertTrue(planner.decide(LabyrinthEntryPageState.PRE_HOME_DATA_LOADING, 1920, 1080, 1) is LabyrinthEntryActionDecision.Wait)
+        assertTrue(planner.decide(LabyrinthEntryPageState.UNKNOWN, 1920, 1080, 2) is LabyrinthEntryActionDecision.Wait)
+        assertTrue(planner.decide(LabyrinthEntryPageState.TITLE_WAITING_TAP, 1920, 1080, 3) is LabyrinthEntryActionDecision.Execute)
+        for (now in listOf(1000L, 2000L)) {
+            assertTrue(planner.decide(LabyrinthEntryPageState.UNKNOWN, 1920, 1080, now) is LabyrinthEntryActionDecision.Execute)
+        }
+        assertTrue(planner.decide(LabyrinthEntryPageState.PRE_HOME_DATA_LOADING, 1920, 1080, 60000L) is LabyrinthEntryActionDecision.Wait)
+        assertTrue(planner.decide(LabyrinthEntryPageState.UNKNOWN, 1920, 1080, 61000L) is LabyrinthEntryActionDecision.Stop)
+    }
+
     @Test fun `idle title and blank frames do not become connecting`() {
         val idle = readImage(File(fixtures, "idle.png"))
         for ((w, h) in listOf(1280 to 720, 1920 to 1080, 2560 to 1440)) {

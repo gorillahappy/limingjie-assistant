@@ -439,7 +439,9 @@ class GameSessionResetWorkflow(
     ) {
         // 识别帧回调驱动推进；此处等待目标阶段被 onFrame 转换到达
         while (activeSessionId == sessionId && stage != target) {
-            if (stage == GameSessionResetStage.FAILED) error("会话重置失败")
+            if (stage == GameSessionResetStage.FAILED) {
+                error(_state.value.message ?: "会话重置失败")
+            }
             if (stage == GameSessionResetStage.SESSION_BLOCKED) {
                 onBlocked(sessionId, _state.value.lastBlock)
                 error("会话被阻塞：${_state.value.lastBlock}")

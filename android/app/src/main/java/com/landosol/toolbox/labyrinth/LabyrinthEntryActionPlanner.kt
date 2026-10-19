@@ -234,8 +234,13 @@ class LabyrinthEntryActionPlanner(
                 }
             }
 
-            LabyrinthEntryPageState.PRE_HOME_DATA_LOADING ->
+            LabyrinthEntryPageState.PRE_HOME_DATA_LOADING -> {
+                // Loading is not a dismissible presentation. Do not spend its time in the
+                // 45-second pre-announcement window; the unchanged total entry timeout bounds it.
+                // Keep the click count and do not arm unknown-page clicks without an entry phase.
+                if (preAnnouncementStartedAt != Long.MIN_VALUE) preAnnouncementStartedAt = nowMillis
                 LabyrinthEntryActionDecision.Wait("正在进行数据连接，等待加载完成")
+            }
 
             LabyrinthEntryPageState.GAME_LOADING_PROGRESS,
             -> planPreAnnouncementClick(nowMillis, frameWidth, frameHeight, allowStartingPhase = true)
