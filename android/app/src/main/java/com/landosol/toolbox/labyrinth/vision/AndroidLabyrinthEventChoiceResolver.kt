@@ -176,10 +176,10 @@ class AndroidLabyrinthEventChoiceResolver(
                 stateScores = result.observation.stateScores +
                     (LabyrinthEntryPageState.EVENT_CHOICE to anchorScore),
                 anchorScores = updatedAnchors,
-                reason = if (trusted) {
-                    "事件OCR已稳定匹配 ${event.id}"
-                } else {
-                    "事件OCR候选 ${event.id}，等待重复确认"
+                reason = when {
+                    trusted -> "事件OCR已稳定匹配 ${event.id}"
+                    !match.trusted -> "事件OCR候选 ${event.id}，文字匹配或相似事件分差不足"
+                    else -> "事件OCR候选 ${event.id}，等待连续帧确认"
                 },
             ),
             matchedFeatures = (result.matchedFeatures + EVENT_OCR_FEATURE).distinct(),

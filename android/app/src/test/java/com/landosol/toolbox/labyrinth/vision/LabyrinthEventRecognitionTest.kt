@@ -5,10 +5,55 @@ import com.landosol.toolbox.gamedata.EventLayoutTemplateResource
 import com.landosol.toolbox.gamedata.EventResource
 import com.landosol.toolbox.gamedata.NormalizedOcrRect
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LabyrinthEventRecognitionTest {
+    @Test
+    fun `shared title and generic rewards cannot authorize a guild choice`() {
+        val match = LabyrinthEventTextRecognizer(guildEvents()).recognize(
+            "这里是公会管理协会！请问要找什么样的伙伴？" +
+                "想要型成为伙伴！型职能的随机印记x2阿尔法金币200".repeat(2),
+        )
+        assertFalse("score=${match.score}, margin=${match.margin}", match.trusted)
+    }
+
+    @Test
+    fun `conflicting profession pairs remain ambiguous regardless of catalog order`() {
+        val events = guildEvents()
+        val text = events[1].name + (events[1].choices + events[2].choices)
+            .joinToString(" ") { it.name + it.description }
+        for (catalog in listOf(events, events.reversed())) {
+            val match = LabyrinthEventTextRecognizer(catalog).recognize(text)
+            assertFalse(match.trusted)
+            assertEquals(0.0, match.margin, 0.00001)
+        }
+    }
+
+    @Test
+    fun `traditional profession forms are canonicalized without guessing different characters`() {
+        assertEquals("减扰强疗击滅王", normalizeEventText("減擾強療擊滅王"))
+        val events = guildEvents()
+        val recognizer = LabyrinthEventTextRecognizer(events)
+        for (event in events) {
+            val text = (event.name + event.choices.joinToString(" ") { it.name + it.description })
+                .replace('减', '減').replace('扰', '擾').replace('强', '強')
+                .replace('疗', '療').replace('击', '擊')
+            val match = recognizer.recognize(text)
+            assertEquals(event.id, match.event?.id)
+            assertTrue("event=${event.id}, score=${match.score}, margin=${match.margin}", match.trusted)
+        }
+    }
+
+    @Test
+    fun `profession words without the guild title cannot authorize a guild choice`() {
+        val match = LabyrinthEventTextRecognizer(guildEvents()).recognize(
+            "这是一个其他页面" + guildEvents()[2].choices.joinToString(" ") { it.name + it.description },
+        )
+        assertFalse(match.trusted)
+    }
+
     @Test
     fun `guild reference text resolves attacker breaker event rather than shared-title siblings`() {
         val recognizer = LabyrinthEventTextRecognizer(guildEvents())

@@ -99,7 +99,7 @@ class LabyrinthEventChoicePlanner(
         val actionSafe = observation.trusted && buttonEnabled && !rejected &&
             (!rolePoolChoice || missingOwnedProfiles.isEmpty())
         val safetyNote = when {
-            !observation.trusted -> "事件文字尚未连续稳定确认"
+            !observation.trusted -> "事件文字仍有歧义或尚未稳定确认"
             rejected -> "选项${best.choice.id}已点击且页面未变化，不再重复点击"
             !buttonEnabled ->
                 "推荐按钮为灰蓝不可用状态(亮蓝${"%.2f".format(visual.enabledConfidence)})，通常是金币或条件不足"

@@ -185,6 +185,33 @@ class LabyrinthEventFlowRegressionTest {
     }
 
     @Test
+    fun `all guild and arena variants retain identity against the complete production catalog`() {
+        val events = json.parseToJsonElement(File(assets, "events.placeholder.json").readText())
+            .jsonObject.getValue("events").jsonArray.map { json.decodeFromJsonElement<EventResource>(it) }
+        val recognizer = LabyrinthEventTextRecognizer(events)
+        for (id in listOf("1101", "1102", "1103", "1104", "1105", "1109", "1113", "1117")) {
+            val event = events.single { it.id == id }
+            val match = recognizer.recognize(event.name + event.choices.joinToString(" ") { it.name + it.description })
+            assertEquals(id, match.event?.id)
+            assertTrue("event=$id, score=${match.score}, margin=${match.margin}", match.trusted)
+        }
+    }
+
+    @Test
+    fun `captured debuff disrupt OCR separates guild variants in the complete catalog`() {
+        val events = json.parseToJsonElement(File(assets, "events.placeholder.json").readText())
+            .jsonObject.getValue("events").jsonArray.map { json.decodeFromJsonElement<EventResource>(it) }
+        val rawText = File(root,
+            "android/app/src/test/resources/labyrinth/event-guild-debuff-disrupt-20261024.txt").readText()
+        val match = LabyrinthEventTextRecognizer(events).recognize(rawText)
+        println("GUILD_CAPTURE event=${match.event?.id} score=${match.score} margin=${match.margin} trusted=${match.trusted}")
+        assertEquals("1103", match.event?.id)
+        assertTrue("score=${match.score}, margin=${match.margin}", match.trusted)
+        assertTrue(match.margin >= 0.045)
+        assertEquals(listOf("11031", "11032"), match.event!!.choices.sortedBy { it.slot }.map { it.id })
+    }
+
+    @Test
     fun `old OCR callback cannot replace or cancel the new request even for identical images`() {
         val cache = LabyrinthEventOcrCache()
         val key = LabyrinthEventOcrCache.Key(10, EntryPixelRect(10, 10, 100, 100))

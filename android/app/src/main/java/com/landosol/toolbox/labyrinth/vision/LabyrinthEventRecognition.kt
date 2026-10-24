@@ -95,6 +95,29 @@ class LabyrinthEventTextRecognizer(
         require(events.map(EventResource::id).distinct().size == events.size)
     }
 
+    // Shared boilerplate (e.g. "想要…型成为伙伴") must not outweigh the profession names
+    // that actually distinguish same-title events. Derive those names from the catalog;
+    // identical labels (arena variants) and short/ambiguous remainders retain full-label scoring.
+    private val distinctiveLabels: Map<Pair<String, Int>, String> = buildMap {
+        events.groupBy { normalizeEventText(it.name) }.values.filter { it.size > 1 }.forEach { siblings ->
+            val slots = siblings.flatMap { it.choices }.map { it.slot }.distinct()
+            slots.forEach slotLoop@{ slot ->
+                val choices = siblings.mapNotNull { event ->
+                    event.choices.singleOrNull { it.slot == slot }?.let { event.id to it }
+                }
+                if (choices.size != siblings.size) return@slotLoop
+                val labels = choices.map { normalizeEventText(it.second.name) }
+                if (labels.distinct().size != siblings.size) return@slotLoop
+                val prefix = labels.reduce { common, label -> common.commonPrefixWith(label) }
+                val withoutPrefix = labels.map { it.removePrefix(prefix) }
+                val suffix = withoutPrefix.reduce { common, label -> common.commonSuffixWith(label) }
+                val cores = withoutPrefix.map { it.removeSuffix(suffix) }
+                if (cores.any { it.length < 2 }) return@slotLoop
+                choices.zip(cores).forEach { (entry, core) -> put(entry.first to slot, core) }
+            }
+        }
+    }
+
     fun recognize(observedText: String): LabyrinthEventTextMatch {
         val observed = normalizeEventText(observedText)
         if (observed.length < MINIMUM_OBSERVED_TEXT_LENGTH) return emptyMatch()
@@ -121,7 +144,7 @@ class LabyrinthEventTextRecognizer(
         val choiceScores = event.choices.map { choice ->
             val label = normalizeEventText(choice.name)
             val description = normalizeEventText(choice.description)
-            val labelScore = fuzzyContainedScore(label, observed)
+            val labelScore = fuzzyContainedScore(distinctiveLabels[event.id to choice.slot] ?: label, observed)
             val descriptionScore = fuzzyContainedScore(description, observed)
             val digitScore = numericEvidenceScore(label + description, observed)
             labelScore * 0.48 + descriptionScore * 0.37 + digitScore * 0.15
@@ -249,7 +272,17 @@ class LabyrinthEventLayoutMapper(
 
 internal fun normalizeEventText(value: String): String = buildString(value.length) {
     value.lowercase().forEach { character ->
-        if (character.isLetterOrDigit()) append(character)
+        // These are equivalent traditional forms, not guesses at OCR substitutions such as
+        // 滅→减 or 王→干. Incorrect characters still need independent evidence in the block.
+        val canonical = when (character) {
+            '減' -> '减'
+            '擾' -> '扰'
+            '強' -> '强'
+            '療' -> '疗'
+            '擊' -> '击'
+            else -> character
+        }
+        if (canonical.isLetterOrDigit()) append(canonical)
     }
 }
 
