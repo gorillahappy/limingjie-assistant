@@ -16,6 +16,9 @@ sealed interface LabyrinthEventChoiceDecision {
         /** False keeps the recommendation visible in Dry Run but forbids a live tap. */
         val actionSafe: Boolean,
         val safetyNote: String? = null,
+        /** Used only by the delayed fallback gate; never inferred from translated UI messages. */
+        val nonTextSafetyPassed: Boolean = false,
+        val degraded: Boolean = false,
     ) : LabyrinthEventChoiceDecision
 
     data class Wait(val reason: String) : LabyrinthEventChoiceDecision
@@ -96,8 +99,9 @@ class LabyrinthEventChoicePlanner(
         val rolePoolChoice = best.choice.id.toIntOrNull() in ROLE_CLASS_BY_CHOICE
         val buttonEnabled = visual.enabledConfidence >= MINIMUM_ENABLED_BUTTON_CONFIDENCE
         val rejected = best.choice.id in rejectedChoiceIds
-        val actionSafe = observation.trusted && buttonEnabled && !rejected &&
+        val nonTextSafetyPassed = buttonEnabled && !rejected &&
             (!rolePoolChoice || missingOwnedProfiles.isEmpty())
+        val actionSafe = observation.trusted && nonTextSafetyPassed
         val safetyNote = when {
             !observation.trusted -> "事件文字仍有歧义或尚未稳定确认"
             rejected -> "选项${best.choice.id}已点击且页面未变化，不再重复点击"
@@ -116,6 +120,7 @@ class LabyrinthEventChoicePlanner(
             explanation = best.detail,
             actionSafe = actionSafe,
             safetyNote = safetyNote,
+            nonTextSafetyPassed = nonTextSafetyPassed,
         )
     }
 

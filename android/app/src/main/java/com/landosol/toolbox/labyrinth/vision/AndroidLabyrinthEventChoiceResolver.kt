@@ -160,6 +160,10 @@ class AndroidLabyrinthEventChoiceResolver(
             rivalMargin = match.margin,
             stableFrames = stableFrames,
             trusted = trusted,
+            textTrustFailure = if (match.trusted && !trusted) LabyrinthEventTextTrustFailure.UNSTABLE
+                else match.trustFailure,
+            titleScore = match.titleScore,
+            choiceScore = match.choiceScore,
         )
         val anchorScore = match.score.coerceIn(0.0, 1.0)
         val updatedAnchors = LabyrinthAnchorScores(

@@ -7,6 +7,8 @@ import com.landosol.toolbox.gamedata.NormalizedOcrRect
 import kotlin.math.max
 import kotlin.math.roundToInt
 
+enum class LabyrinthEventTextTrustFailure { UNKNOWN, NONE, NO_CANDIDATE, LOW_SCORE, RIVAL_MARGIN, UNSTABLE }
+
 data class LabyrinthEventTextMatch(
     val event: EventResource?,
     val score: Double,
@@ -14,6 +16,7 @@ data class LabyrinthEventTextMatch(
     val titleScore: Double,
     val choiceScore: Double,
     val trusted: Boolean,
+    val trustFailure: LabyrinthEventTextTrustFailure = LabyrinthEventTextTrustFailure.UNKNOWN,
 )
 
 data class LabyrinthEventChoiceVisual(
@@ -46,6 +49,9 @@ data class LabyrinthEventChoiceObservation(
     val rivalMargin: Double,
     val stableFrames: Int,
     val trusted: Boolean,
+    val textTrustFailure: LabyrinthEventTextTrustFailure = LabyrinthEventTextTrustFailure.UNKNOWN,
+    val titleScore: Double = 0.0,
+    val choiceScore: Double = 0.0,
 )
 
 data class LabyrinthEventOcrCacheDiagnostics(
@@ -136,6 +142,12 @@ class LabyrinthEventTextRecognizer(
             titleScore = best.titleScore,
             choiceScore = best.choiceScore,
             trusted = candidate && best.score >= minimumTrustedScore && margin >= minimumTrustedMargin,
+            trustFailure = when {
+                !candidate -> LabyrinthEventTextTrustFailure.NO_CANDIDATE
+                best.score < minimumTrustedScore -> LabyrinthEventTextTrustFailure.LOW_SCORE
+                margin < minimumTrustedMargin -> LabyrinthEventTextTrustFailure.RIVAL_MARGIN
+                else -> LabyrinthEventTextTrustFailure.NONE
+            },
         )
     }
 
@@ -213,7 +225,8 @@ class LabyrinthEventTextRecognizer(
             .groupingBy(String::toString)
             .eachCount()
 
-    private fun emptyMatch() = LabyrinthEventTextMatch(null, 0.0, 0.0, 0.0, 0.0, false)
+    private fun emptyMatch() = LabyrinthEventTextMatch(null, 0.0, 0.0, 0.0, 0.0, false,
+        LabyrinthEventTextTrustFailure.NO_CANDIDATE)
 
     private data class ScoredEvent(
         val event: EventResource,

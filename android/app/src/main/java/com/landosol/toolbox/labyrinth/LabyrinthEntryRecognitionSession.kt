@@ -1320,6 +1320,7 @@ class LabyrinthEntryRecognitionSession(
     private var eventChoiceCommittedChoiceId: String? = null
     /** Choices tapped on this event visit that left the page unchanged; see the planner's KDoc. */
     private val eventChoiceRejectedIds = linkedSetOf<String>()
+    private val eventChoiceFallbackGate = LabyrinthEventChoiceFallbackGate()
     @Volatile
     private var relicFocusMark: LabyrinthRelicMark? = null
     /** Latest game-visible "当前：N" values. These override history-derived stacks when known. */
@@ -2175,6 +2176,24 @@ class LabyrinthEntryRecognitionSession(
         refreshRelicStackCalibration(result)
         refreshRoleRewardChoiceDecision(sessionId, result, frameWidth, frameHeight)
         refreshEventChoiceDecision(sessionId, result)
+        if (!current.dryRun && entryPhaseComplete) {
+            when (val fallback = eventChoiceFallbackGate.evaluate(result, _state.value.eventChoiceDecision, timestampMillis)) {
+                is LabyrinthEventFallbackResult.Stop -> {
+                    finishFromPlanner(sessionId, fallback.reason)
+                    return
+                }
+                is LabyrinthEventFallbackResult.Wait -> {
+                    _state.value = _state.value.copy(message = fallback.reason,
+                        eventChoiceDecision = (_state.value.eventChoiceDecision as? LabyrinthEventChoiceDecision.Select)
+                            ?.copy(actionSafe = false, safetyNote = fallback.reason, degraded = true))
+                    overlayCoordinator.update(sessionId, buildOverlayPresentation(sessionId))
+                    return
+                }
+                is LabyrinthEventFallbackResult.Allow ->
+                    _state.value = _state.value.copy(eventChoiceDecision = fallback.decision)
+                LabyrinthEventFallbackResult.Normal -> Unit
+            }
+        }
         refreshEffectiveCharacterScan(sessionId, result, frameWidth, frameHeight, timestampMillis)
         refreshBattleTeamRecommendation(sessionId, pageState)
         refreshBattleTeamSelectionPlan(sessionId, pageState, result.battleTeamSelection)
@@ -2556,6 +2575,7 @@ class LabyrinthEntryRecognitionSession(
 
     /** Restart login/entry navigation while retaining any already-loaded route progress. */
     private fun restartEntryNavigationAfterSessionError() {
+        eventChoiceFallbackGate.reset()
         battleWait.reset()
         entryPhaseComplete = false
         resetPendingNodeClickStability()
@@ -5189,7 +5209,8 @@ class LabyrinthEntryRecognitionSession(
                 when (val decision = _state.value.eventChoiceDecision) {
                     is LabyrinthEventChoiceDecision.Select -> if (decision.actionSafe) {
                         LabyrinthPostEntryTapPlan(
-                            LabyrinthPostEntryActionKind.SELECT_EVENT,
+                            if (decision.degraded) LabyrinthPostEntryActionKind.SELECT_EVENT_DEGRADED
+                                else LabyrinthPostEntryActionKind.SELECT_EVENT,
                             "选择事件：${decision.choiceId} ${decision.label}；${decision.explanation}",
                             decision.buttonRect,
                         )
@@ -5950,6 +5971,17 @@ class LabyrinthEntryRecognitionSession(
         eventFreeRoleConfirmIds: List<String> = emptyList(),
     ) {
         if (!beginGuardedAction()) return
+        if (kind == LabyrinthPostEntryActionKind.SELECT_EVENT_DEGRADED) {
+            if (!eventChoiceFallbackGate.markDispatched(timestampMillis)) {
+                endGuardedAction()
+                return
+            }
+            val decision = _state.value.eventChoiceDecision as? LabyrinthEventChoiceDecision.Select
+            nodeLog("event-choice-degraded event=${decision?.eventId} choice=${decision?.choiceId} " +
+                "score=${_state.value.lastResult?.eventChoiceSelection?.confidence} " +
+                "margin=${_state.value.lastResult?.eventChoiceSelection?.rivalMargin} " +
+                "waitMillis=${LabyrinthEventChoiceFallbackGate.WAIT_MILLIS} rect=$rect", warning = true)
+        }
         val selectedReward = (_state.value.roleRewardChoiceDecision as? LabyrinthRoleRewardChoiceDecision.Select)
             ?.takeIf { it.characterId == roleRewardSelectedCharacterId && it.actionSafe }
         val selectedRewardAccountId = activeRunAccountId
@@ -5966,7 +5998,9 @@ class LabyrinthEntryRecognitionSession(
         resetPostEntryStall()
         postEntryAttempts++
         lastPostEntryActionAt = timestampMillis
-        if (kind == LabyrinthPostEntryActionKind.SELECT_EVENT || kind == LabyrinthPostEntryActionKind.ADVANCE_EVENT_ANIMATION) {
+        if (kind == LabyrinthPostEntryActionKind.SELECT_EVENT ||
+            kind == LabyrinthPostEntryActionKind.SELECT_EVENT_DEGRADED ||
+            kind == LabyrinthPostEntryActionKind.ADVANCE_EVENT_ANIMATION) {
             eventActionAttempts++
         }
         if (kind == LabyrinthPostEntryActionKind.ADVANCE_CHARACTER_ACQUISITION) {
@@ -6216,6 +6250,7 @@ class LabyrinthEntryRecognitionSession(
     }
 
     private fun resetNodeExecutionState() {
+        eventChoiceFallbackGate.reset()
         battleWait.reset()
         eventFreeRoleSelectedCharacterIds.clear()
         eventFreeRoleLastSelectAt = Long.MIN_VALUE

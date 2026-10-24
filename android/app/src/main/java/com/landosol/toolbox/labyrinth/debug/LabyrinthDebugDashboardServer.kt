@@ -474,6 +474,9 @@ class LabyrinthDebugDashboardServer(
             put("eventId", event.event.id)
             put("optionCount", event.choices.size)
             put("trusted", event.trusted)
+            put("textTrustFailure", event.textTrustFailure.name)
+            put("titleScore", event.titleScore)
+            put("choiceScore", event.choiceScore)
             put("choices", JSONArray().apply {
                 event.choices.forEach { visual -> put(JSONObject().apply {
                     put("choiceId", visual.choice.id)
@@ -494,6 +497,8 @@ class LabyrinthDebugDashboardServer(
                 put("choiceId", decision.choiceId)
                 put("button", rectJson(decision.buttonRect))
                 put("actionSafe", decision.actionSafe)
+                put("nonTextSafetyPassed", decision.nonTextSafetyPassed)
+                put("degraded", decision.degraded)
                 put("safetyNote", decision.safetyNote ?: JSONObject.NULL)
             }
             is LabyrinthEventChoiceDecision.Wait -> JSONObject().apply {

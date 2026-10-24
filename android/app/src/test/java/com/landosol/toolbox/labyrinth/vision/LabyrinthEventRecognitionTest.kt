@@ -11,6 +11,21 @@ import org.junit.Test
 
 class LabyrinthEventRecognitionTest {
     @Test
+    fun `structured trust failure distinguishes margin from low score and missing candidates`() {
+        val event = guildEvents()[2]
+        val text = event.name + event.choices.joinToString(" ") { it.name + it.description }
+        assertEquals(LabyrinthEventTextTrustFailure.NONE, LabyrinthEventTextRecognizer(guildEvents()).recognize(text).trustFailure)
+        val tied = LabyrinthEventTextRecognizer(listOf(event, event.copy(id = "same-text"))).recognize(text)
+        assertEquals(LabyrinthEventTextTrustFailure.RIVAL_MARGIN, tied.trustFailure)
+        assertEquals(0.0, tied.margin, 0.0)
+        val low = LabyrinthEventTextRecognizer(guildEvents(), minimumTrustedScore = 1.0)
+            .recognize(text.replace("阿尔法金币", "阿尔去金币"))
+        assertEquals(LabyrinthEventTextTrustFailure.LOW_SCORE, low.trustFailure)
+        assertEquals(LabyrinthEventTextTrustFailure.NO_CANDIDATE,
+            LabyrinthEventTextRecognizer(guildEvents()).recognize("").trustFailure)
+    }
+
+    @Test
     fun `shared title and generic rewards cannot authorize a guild choice`() {
         val match = LabyrinthEventTextRecognizer(guildEvents()).recognize(
             "这里是公会管理协会！请问要找什么样的伙伴？" +

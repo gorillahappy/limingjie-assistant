@@ -25,7 +25,7 @@ android {
         debug {
             if (providers.gradleProperty("resolutionTest").orNull == "true") {
                 applicationIdSuffix = ".resolutiontest"
-                versionNameSuffix = "-resolution-test.10"
+                versionNameSuffix = "-resolution-test.11"
                 buildConfigField("int", "DEBUG_DASHBOARD_PORT", "8766")
                 resValue("string", "app_name", "黎明界助手·分辨率测试")
             }

@@ -19,6 +19,8 @@ internal enum class LabyrinthPostEntryActionKind {
 
     // Events
     SELECT_EVENT,
+    /** A single delayed margin-only fallback; never uses ordinary event retries. */
+    SELECT_EVENT_DEGRADED,
     ADVANCE_EVENT_ANIMATION,
     EVENT_FREE_ROLE_SELECT,
     EVENT_FREE_ROLE_CONFIRM,
