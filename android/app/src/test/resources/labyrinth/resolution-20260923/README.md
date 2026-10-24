@@ -1,5 +1,14 @@
 # Login resolution regression fixtures
 
+2026-10-24 test.8 HOME navigation incident:
+- `home-navigation-20261024.png`: last diagnosed 2560x1440 home frame, HOME .826,
+  three navigation taps completed but no transition before the retry limit.
+- `adventure-after-manual-20261024.png`: the same device after the user manually
+  tapped Adventure and reported immediate entry. This is a user action, not proof
+  that the new automatic retry policy has passed on-device testing.
+Top currency/status numeric areas are masked; the required page/control anchors
+are retained. No UID or credentials are included. Raw diagnostics stay local.
+
 2026-10-18 user report, device log clock 2026-10-19:
 - `loading-comic-20261018.jpg`: native 2560x1440 last captured test.7 reset
   frame, with both the top-right connection label and bottom-right loading text.

@@ -44,10 +44,13 @@ data class LabyrinthEntryActionPlannerConfig(
     /** A stable map seen without any opening roster page is treated as a mid-run handoff. */
     val midRunNodeSelectionStableFrames: Int = 6,
     val totalTimeoutMillis: Long = 120_000L,
+    /** Allow the newly opened home scene to accept navigation before spending all three attempts. */
+    val homeNavigationActionIntervalMillis: Long = 4_000L,
 ) {
     init {
         require(stableFrames > 0)
         require(pageActionIntervalMillis > 0)
+        require(homeNavigationActionIntervalMillis > 0)
         require(dawnRealmActionIntervalMillis > 0)
         require(preAnnouncementClickIntervalMillis > 0)
         require(maxPageActionAttempts > 0)
@@ -269,8 +272,12 @@ class LabyrinthEntryActionPlanner(
                 LabyrinthEntryActionKind.OPEN_ADVENTURE,
                 "打开冒险",
                 HOME_ADVENTURE,
+                actionIntervalMillis = config.homeNavigationActionIntervalMillis,
                 anchorMatches = anchorMatches,
                 anchorIds = listOf(EntryAnchorId.HOME_ADVENTURE),
+                // The graphic centre may be decorative/temporarily inactive. Retry on the
+                // label inside the same trusted control, never at an unrelated screen position.
+                anchorVerticalFraction = if (attemptsForState > 0) 0.8f else 0.5f,
             )
 
             LabyrinthEntryPageState.ADVENTURE -> planPageAction(
@@ -756,6 +763,7 @@ class LabyrinthEntryActionPlanner(
         actionIntervalMillis: Long = config.pageActionIntervalMillis,
         anchorMatches: Map<String, EntryAnchorMatch> = emptyMap(),
         anchorIds: List<String> = emptyList(),
+        anchorVerticalFraction: Float = 0.5f,
     ): LabyrinthEntryActionDecision {
         if (stableFrameCount < config.stableFrames) {
             return LabyrinthEntryActionDecision.Wait("等待页面稳定")
@@ -766,7 +774,7 @@ class LabyrinthEntryActionPlanner(
         if (attemptsForState >= config.maxPageActionAttempts) {
             return LabyrinthEntryActionDecision.Stop("${lastState?.name} 动作连续失败")
         }
-        val action = mapAnchorTap(anchorMatches, anchorIds)
+        val action = mapAnchorTap(anchorMatches, anchorIds, anchorVerticalFraction)
             ?: mapTap(referencePoint, frameWidth, frameHeight)
             ?: return LabyrinthEntryActionDecision.Stop("动作坐标无法映射到当前画面")
         attemptsForState++
@@ -777,6 +785,7 @@ class LabyrinthEntryActionPlanner(
     private fun mapAnchorTap(
         anchorMatches: Map<String, EntryAnchorMatch>,
         anchorIds: List<String>,
+        verticalFraction: Float,
     ): AutomationAction.Tap? = anchorIds
         .asSequence()
         .mapNotNull(anchorMatches::get)
@@ -787,7 +796,7 @@ class LabyrinthEntryActionPlanner(
             AutomationAction.Tap(
                 ScreenPoint(
                     x = rect.left + rect.width / 2f,
-                    y = rect.top + rect.height / 2f,
+                    y = rect.top + rect.height * verticalFraction,
                 ),
             )
         }

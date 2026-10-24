@@ -137,6 +137,34 @@ class ResolutionEntryRegressionTest {
         assertTrue(planner.decide(LabyrinthEntryPageState.UNKNOWN, 1920, 1080, 61000L) is LabyrinthEntryActionDecision.Stop)
     }
 
+    @Test fun `reported home waits and retries inside adventure control then accepts observed adventure`() {
+        val home = readImage(File(fixtures, "home-navigation-20261024.png"))
+        val adventure = readImage(File(fixtures, "adventure-after-manual-20261024.png"))
+        for ((w, h) in listOf(1280 to 720, 1920 to 1080, 2560 to 1440)) {
+            val before = processor().process(if (w == home.width) home else resize(home, w, h))
+            val after = processor().process(if (w == adventure.width) adventure else resize(adventure, w, h))
+            println("HOME_NAV $w x $h home=${before.observation.state} adventure=${after.observation.state} homeScore=${before.observation.confidence} control=${before.anchorMatches[EntryAnchorId.HOME_ADVENTURE]}")
+            assertEquals(LabyrinthEntryPageState.HOME, before.observation.state)
+            assertEquals(LabyrinthEntryPageState.ADVENTURE, after.observation.state)
+            val planner = LabyrinthEntryActionPlanner(LabyrinthEntryActionPlannerConfig(stableFrames = 1))
+            planner.start(0)
+            assertTrue(planner.decide(LabyrinthEntryPageState.HOME_ANNOUNCEMENT, w, h, 0) is LabyrinthEntryActionDecision.Execute)
+            fun atHome(now: Long) = planner.decide(before.observation.state, w, h, now,
+                before.observation.anchorScores, before.anchorMatches)
+            assertTrue(atHome(1500) is LabyrinthEntryActionDecision.Wait)
+            assertTrue(atHome(4000) is LabyrinthEntryActionDecision.Execute)
+            assertTrue(atHome(5200) is LabyrinthEntryActionDecision.Wait)
+            val retry = atHome(8000) as LabyrinthEntryActionDecision.Execute
+            val point = (retry.action as com.landosol.toolbox.automation.AutomationAction.Tap).point
+            val rect = requireNotNull(before.anchorMatches[EntryAnchorId.HOME_ADVENTURE]).rect
+            assertTrue(point.x >= rect.left && point.x < rect.left + rect.width)
+            assertTrue(point.y > rect.top + rect.height / 2f && point.y < rect.top + rect.height)
+            val next = planner.decide(after.observation.state, w, h, 10000L,
+                after.observation.anchorScores, after.anchorMatches) as LabyrinthEntryActionDecision.Execute
+            assertEquals(com.landosol.toolbox.labyrinth.LabyrinthEntryActionKind.OPEN_DAWN_REALM, next.kind)
+        }
+    }
+
     @Test fun `idle title and blank frames do not become connecting`() {
         val idle = readImage(File(fixtures, "idle.png"))
         for ((w, h) in listOf(1280 to 720, 1920 to 1080, 2560 to 1440)) {

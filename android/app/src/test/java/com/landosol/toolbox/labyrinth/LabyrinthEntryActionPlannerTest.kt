@@ -22,6 +22,27 @@ import org.junit.Test
 
 class LabyrinthEntryActionPlannerTest {
     @Test
+    fun `home navigation gives each attempt time and retries inside its trusted label`() {
+        val planner = LabyrinthEntryActionPlanner(LabyrinthEntryActionPlannerConfig(stableFrames = 1))
+        planner.start(0)
+        assertTrue(decide(planner, LabyrinthEntryPageState.HOME_ANNOUNCEMENT, 0) is LabyrinthEntryActionDecision.Execute)
+        val rect = EntryPixelRect(1351, 1253, 172, 179)
+        val anchors = mapOf(EntryAnchorId.HOME_ADVENTURE to EntryAnchorMatch(0.826, rect))
+        fun home(now: Long) = planner.decide(LabyrinthEntryPageState.HOME, 2560, 1440, now, anchorMatches = anchors)
+        assertTrue(home(1500) is LabyrinthEntryActionDecision.Wait)
+        val first = (home(4000) as LabyrinthEntryActionDecision.Execute).action as AutomationAction.Tap
+        assertTrue(home(5200) is LabyrinthEntryActionDecision.Wait)
+        val retry = (home(8000) as LabyrinthEntryActionDecision.Execute).action as AutomationAction.Tap
+        assertTrue(retry.point.y > first.point.y)
+        assertTrue(retry.point.x >= rect.left && retry.point.x < rect.left + rect.width)
+        assertTrue(retry.point.y >= rect.top && retry.point.y < rect.top + rect.height)
+        assertTrue(home(12000) is LabyrinthEntryActionDecision.Execute)
+        assertTrue(home(15999) is LabyrinthEntryActionDecision.Wait)
+        assertTrue(home(16000) is LabyrinthEntryActionDecision.Stop)
+        assertTrue((home(120001) as LabyrinthEntryActionDecision.Stop).reason.contains("总超时"))
+    }
+
+    @Test
     fun `node map view is read only and never becomes node selection`() {
         val planner = LabyrinthEntryActionPlanner(
             LabyrinthEntryActionPlannerConfig(stableFrames = 1),
@@ -561,6 +582,7 @@ class LabyrinthEntryActionPlannerTest {
             LabyrinthEntryActionPlannerConfig(
                 stableFrames = 1,
                 pageActionIntervalMillis = 1L,
+                homeNavigationActionIntervalMillis = 1L,
                 maxPageActionAttempts = 2,
             ),
         )
