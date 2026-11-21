@@ -193,6 +193,34 @@ object LabyrinthOpeningRosterCatalog {
             ),
             grantedCharacters = listOf(character("1068", "菈比莉斯塔")),
         ),
+        LabyrinthOpeningRosterConfig(
+            guildId = 6, guildName = "慈乐之音",
+            slots = listOf(
+                slot(character("1348", "纺希（吉奥·矶汉拿）")),
+                slot(character("1344", "千歌（礼服）")),
+                slot(character("1054", "纺希"), character("1116", "望(圣诞节)")),
+            ),
+        ),
+        LabyrinthOpeningRosterConfig(
+            guildId = 7, guildName = "恶魔伪王国军",
+            slots = listOf(
+                slot(character("1082", "宫子(万圣节)")),
+                slot(character("1117", "伊莉亚(圣诞节)")),
+                slot(character("1138", "依里(天使)")),
+            ),
+        ),
+        LabyrinthOpeningRosterConfig(
+            guildId = 8, guildName = "伊丽莎白牧场",
+            slots = listOf(slot(character("1033", "真阳")), slot(character("1026", "铃")), slot(character("1038", "栞"))),
+        ),
+        LabyrinthOpeningRosterConfig(
+            guildId = 9, guildName = "墨丘利财团",
+            slots = listOf(slot(character("1079", "珠希(夏日)")), slot(character("1168", "珠希(工作服)")), slot(character("1251", "珠希(咖啡厅)"))),
+        ),
+        LabyrinthOpeningRosterConfig(
+            guildId = 10, guildName = "暮光流星群",
+            slots = listOf(slot(character("1056", "流夏")), slot(character("1299", "惠理子(教官)")), slot(character("1051", "深月"))),
+        ),
     ).associateBy(LabyrinthOpeningRosterConfig::guildId)
 
     /** Guilds a user may configure, in catalog order. */

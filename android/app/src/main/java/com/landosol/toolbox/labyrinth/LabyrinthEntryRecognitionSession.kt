@@ -1321,6 +1321,7 @@ class LabyrinthEntryRecognitionSession(
     /** Choices tapped on this event visit that left the page unchanged; see the planner's KDoc. */
     private val eventChoiceRejectedIds = linkedSetOf<String>()
     private val eventChoiceFallbackGate = LabyrinthEventChoiceFallbackGate()
+    private var openingRelicCatalog: LabyrinthOpeningRelicCatalog? = null
     @Volatile
     private var relicFocusMark: LabyrinthRelicMark? = null
     /** Latest game-visible "当前：N" values. These override history-derived stacks when known. */
@@ -1605,6 +1606,7 @@ class LabyrinthEntryRecognitionSession(
         singleBossRetryCountBeforeMulti = 2
         pendingSingleBossFallbackToMulti = false
         bossFallbackMultiTeamActive = false
+        openingRelicCatalog = strategySnapshot?.openingRelicCatalog
         strategySnapshot?.let { snapshot ->
             configuredBossTeamMode = snapshot.settings.bossTeamMode
             bossTeamMode = configuredBossTeamMode
@@ -1630,7 +1632,9 @@ class LabyrinthEntryRecognitionSession(
             battleTeamSelectionPlanner = snapshot.roleRuntime?.battleTeamSelectionPlanner
         }
         val initialRunSnapshot = try {
-            runStateStore?.begin(accountId, clock())
+            persistenceMutex.withLock {
+                runStateStore?.beginWithOpeningRelics(accountId, executionRoute, openingRelicCatalog, clock())
+            }
         } catch (failure: Throwable) {
             sessionManager.stop(session.id)
             requestCaptureStop()
@@ -2838,12 +2842,19 @@ class LabyrinthEntryRecognitionSession(
             relicStackLedger.clear()
             pendingRelicSelection = null
             relicChoiceCommitted = false
+            val openingRoute = validatedRoute
+            val catalog = openingRelicCatalog
             actionScope.launch {
                 runCatching {
-                    persistenceMutex.withLock { store.startNew(accountId, timestampMillis) }
+                    persistenceMutex.withLock {
+                        if (activeSessionId != sessionId) return@launch
+                        store.beginWithOpeningRelics(accountId, openingRoute, catalog, timestampMillis,
+                            reset = true, page = result.observation.state.name)
+                    }
                 }
                     .onSuccess { snapshot ->
                         if (activeSessionId == sessionId) {
+                            relicStackLedger.seedAcquisitions(relicChoicePolicy.markStacks(snapshot.observedRelics))
                             _state.value = _state.value.copy(
                                 joinedCharacters = snapshot.joinedCharacters,
                                 observedRelics = snapshot.observedRelics,
@@ -2854,6 +2865,7 @@ class LabyrinthEntryRecognitionSession(
                     .onFailure { failure ->
                         if (activeSessionId == sessionId) {
                             _state.value = _state.value.copy(message = "清理旧队伍状态失败：${failure.message ?: "未知错误"}")
+                            finishFromPlanner(sessionId, "初始化本局公会遗物记账失败，已停止并保留现场")
                         }
                     }
             }

@@ -212,6 +212,11 @@ class LandosolToolboxApplication : Application() {
         val characterAttributes = roleDecisionRuntime?.profiles
             ?.mapValues { (_, profile) -> profile.attribute }
             .orEmpty()
+        val openingRelicCatalog by lazy {
+            com.landosol.toolbox.labyrinth.LabyrinthOpeningRelicCatalog(
+                com.landosol.toolbox.labyrinth.vision.AndroidLabyrinthRelicTemplateLoader(this).loadRelics(),
+            )
+        }
         LabyrinthEntryRecognitionSession(
             strategyProvider = {
                 val settings = labyrinthStrategySettings.state.value
@@ -222,6 +227,7 @@ class LandosolToolboxApplication : Application() {
                             settings.applyTo(document), settings,
                         )
                     },
+                    openingRelicCatalog,
                 )
             },
             rerollRequester = { accountId ->

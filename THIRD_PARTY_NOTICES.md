@@ -6,6 +6,24 @@ The root CC BY-NC-SA 4.0 license applies to this project's own contributions,
 not to third-party works under different terms. Attribution alone does not
 establish permission or license compatibility for a combined distribution.
 
+## Selected new-guild support from SatenRuiko10032/limingjie-assistant
+
+The test.12 new-guild catalog, initial-role choices, opening-relic mapping and
+enhancement-node parsing are adapted from contributions by SatenRuiko10032,
+quickgk and the existing project contributors:
+
+- <https://github.com/SatenRuiko10032/limingjie-assistant>
+- New guilds/roster: `a9ac22e67d3b6dc4ff4a90cd1d40089bdaef90a6`
+- Opening relics/localized names: `2846b25451993cce66f760757b7185cdb8b4e6b0`
+- Reference tree: `55bd21f3d65213e8bbc29893d25bf51ae6e4ad04`
+
+That tree uses CC BY-NC-SA 4.0. The selected implementation has been modified
+to fit this branch's saved-route JSON and idempotent run ledger; its other
+UI, battle-strategy and execution-engine changes are not incorporated.
+The supplied third-party v11.3 APK is not redistributed, and these credits do
+not establish its exact build provenance. Existing third-party asset terms
+below remain applicable.
+
 ## AutoPCR
 
 The upstream AutoPCR project (Python) is a behavioral, protocol, and

@@ -132,6 +132,7 @@ data class LabyrinthStrategySettings(
 data class LabyrinthStrategySnapshot(
     val settings: LabyrinthStrategySettings,
     val roleRuntime: LabyrinthRoleDecisionRuntime?,
+    val openingRelicCatalog: LabyrinthOpeningRelicCatalog? = null,
 )
 
 internal object LabyrinthStrategySettingsCodec {

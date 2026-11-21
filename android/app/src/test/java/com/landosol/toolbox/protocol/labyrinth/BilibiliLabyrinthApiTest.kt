@@ -9,6 +9,25 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class BilibiliLabyrinthApiTest {
+    @Test fun `enhancement node parser keeps unknown distinct from confirmed empty`() {
+        assertEquals(emptySet<Int>(), parseLabyrinthEnhanceNodeIds(emptyList<Int>()))
+        assertEquals(setOf(1, 31), parseLabyrinthEnhanceNodeIds(listOf(1L, "31", 31)))
+        for (invalid in listOf(null, "31", listOf(31, -1), listOf(31, 0), listOf(31, 1.5),
+            listOf(31, Long.MAX_VALUE), listOf(mapOf("node_id" to 31)))) {
+            assertEquals(null, parseLabyrinthEnhanceNodeIds(invalid))
+        }
+    }
+
+    @Test fun `top response forwards acquired enhancement nodes without changing requests`() = runTest {
+        val session = FakeSession(ArrayDeque(listOf(GameSessionResult.Success(mapOf(
+            "guild_id" to 6L, "labyrinth_enhance_node_list" to listOf(31L, 2L))))))
+        val top = (BilibiliLabyrinthApi(session).top() as LabyrinthOperationResult.Success).value
+        assertEquals(setOf(31, 2), top.enhanceNodeIds)
+        assertEquals(6, top.guildId)
+        assertEquals(listOf("labyrinth/top"), session.paths)
+        assertTrue(session.fields.single().isEmpty())
+    }
+
     @Test
     fun `parses top enter map and retire requests`() = runTest {
         val session = FakeSession(

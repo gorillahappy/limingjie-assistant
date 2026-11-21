@@ -33,7 +33,7 @@ class AndroidLabyrinthRelicTemplateLoader(
         }
     }
 
-    private fun loadRelics(): List<RelicResource> {
+    fun loadRelics(): List<RelicResource> {
         val root = json.parseToJsonElement(readAsset(RELICS_FILE)).jsonObject
         return root["relics"]?.jsonArray.orEmpty().map { json.decodeFromJsonElement<RelicResource>(it) }
     }

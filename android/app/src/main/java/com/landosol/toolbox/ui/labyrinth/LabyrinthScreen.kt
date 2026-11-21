@@ -622,7 +622,7 @@ private fun AuxiliaryToolsSection(
         )
         Text("单独刷开局 · 本次公会", style = MaterialTheme.typography.labelLarge)
         ChoiceRow {
-            state.guildOptions.take(5).forEach { guild ->
+            state.guildOptions.forEach { guild ->
                 FilterChip(
                     selected = standaloneGuildId == guild.guildId,
                     onClick = { onStandaloneGuildSelected(guild.guildId) },
@@ -737,7 +737,7 @@ private fun BatchRunCard(
     onStart: (List<LabyrinthBatchGoal>) -> Unit,
     onStop: () -> Unit,
 ) {
-    val guildOptions = state.guildOptions.take(5)
+    val guildOptions = state.guildOptions
     val selectedDifficulty = state.selectedDifficulty
     val enabled = state.selectedAccount != null &&
         state.settingsReady &&
@@ -766,7 +766,7 @@ private fun BatchRunCard(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.primary,
         )
-        // Per-guild target text and mode; the guild list itself is fixed (top five).
+        // Per-guild target text and mode follow the supported catalog.
         val counts = remember(guildOptions) {
             mutableStateOf(guildOptions.associate { it.guildId to "" })
         }

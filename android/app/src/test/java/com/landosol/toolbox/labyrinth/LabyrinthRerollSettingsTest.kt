@@ -12,7 +12,7 @@ class LabyrinthRerollSettingsTest {
         assertTrue(defaults.rerollUntilFound)
         assertTrue(defaults.retireExisting)
         assertNull(defaults.validationError())
-        assertEquals(5, LabyrinthRerollOptions.guilds.size)
+        assertEquals(10, LabyrinthRerollOptions.guilds.size)
     }
 
     @Test

@@ -23,6 +23,7 @@ class BilibiliLabyrinthApi(
                 guildId = result.data.int("guild_id")?.takeIf { it > 0 },
                 difficulty = result.data.int("difficulty")?.takeIf { it > 0 },
                 clearedDifficulties = cleared,
+                enhanceNodeIds = parseLabyrinthEnhanceNodeIds(result.data["labyrinth_enhance_node_list"]),
             )
         }.fold(
             onSuccess = { LabyrinthOperationResult.Success(it) },
@@ -110,6 +111,20 @@ class BilibiliLabyrinthApi(
             ?: map.boolean("is_area_last_point")
             ?: false,
     )
+}
+
+/** Adapted from SatenRuiko10032/limingjie-assistant; missing or malformed lists stay unknown. */
+internal fun parseLabyrinthEnhanceNodeIds(value: Any?): Set<Int>? {
+    val nodes = value as? List<*> ?: return null
+    return nodes.map { node ->
+        val id = when (node) {
+            is Byte, is Short, is Int, is Long -> (node as Number).toLong()
+            is String -> node.toLongOrNull()
+            else -> null
+        } ?: return null
+        if (id !in 1..Int.MAX_VALUE.toLong()) return null
+        id.toInt()
+    }.toSet()
 }
 
 private fun Any?.asMap(): Map<Any?, Any?>? {

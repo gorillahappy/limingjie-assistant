@@ -16,6 +16,33 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LabyrinthRerollWorkflowTest {
+    @Test fun `new guild generation saves grant evidence with the matching opening`() = runTest {
+        for (guild in 6..10) {
+            val api = FakeApi(top = LabyrinthTop(null, null, null, listOf(ClearedDifficulty(guild, 1)), setOf(31)),
+                enters = ArrayDeque(listOf(matchingEnter(guild.toLong()))))
+            val store = FakeRouteStore()
+            val result = LabyrinthRerollWorkflow(api, store).run(config().copy(guildId = guild)) as LabyrinthRerollResult.Success
+            assertEquals(com.landosol.toolbox.protocol.labyrinth.LabyrinthOpeningRelicState(guild, setOf(31)), result.route.openingRelics)
+            assertEquals(result.route.openingRelics, store.route?.openingRelics)
+            assertTrue(api.retired.isEmpty())
+        }
+    }
+
+    @Test fun `resume and interrupted entry use the actual recovered guild and current node evidence`() = runTest {
+        for (interrupted in listOf(false, true)) {
+            val top = LabyrinthTop(777, 6, 2, listOf(ClearedDifficulty(6, 1)), emptySet())
+            val api = FakeApi(top = top, topResults = if (interrupted) ArrayDeque(listOf(
+                LabyrinthOperationResult.Success(top.copy(enterId = null)), LabyrinthOperationResult.Success(top))) else ArrayDeque(),
+                enterResults = if (interrupted) ArrayDeque(listOf(LabyrinthOperationResult.Failure("network", LabyrinthFailureKind.NETWORK))) else ArrayDeque(),
+                resumes = ArrayDeque(listOf(LabyrinthResume(777, 6, null, matchingEnter(777).map))))
+            val store = FakeRouteStore()
+            val result = LabyrinthRerollWorkflow(api, store, pause = {}).run(config().copy(guildId = 6)) as LabyrinthRerollResult.Success
+            assertEquals(com.landosol.toolbox.protocol.labyrinth.LabyrinthOpeningRelicState(6, emptySet()), result.route.openingRelics)
+            assertEquals(777L, store.route?.enterId)
+            assertTrue(api.retired.isEmpty())
+        }
+    }
+
     @Test
     fun `retires unmatched map and saves matching route`() = runTest {
         val api = FakeApi(

@@ -132,7 +132,9 @@ object LabyrinthRelicMerger {
                         effect = match.effect.orEmpty(),
                         confidence = maxOf(previous.confidence, match.confidence),
                         lastSeenAt = nowMillis,
-                        observationCount = previous.observationCount + 1,
+                        // Fixed opening grants are facts about this run, not repeat acquisitions.
+                        observationCount = if (match.slotId.startsWith("opening:")) previous.observationCount
+                            else previous.observationCount + 1,
                     )
                 } else {
                     merged += LabyrinthObservedRelic(

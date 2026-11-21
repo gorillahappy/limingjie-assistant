@@ -8,6 +8,7 @@ import com.landosol.toolbox.protocol.labyrinth.LabyrinthApi
 import com.landosol.toolbox.protocol.labyrinth.LabyrinthEnterRequest
 import com.landosol.toolbox.protocol.labyrinth.LabyrinthFailureKind
 import com.landosol.toolbox.protocol.labyrinth.LabyrinthMapNode
+import com.landosol.toolbox.protocol.labyrinth.LabyrinthOpeningRelicState
 import com.landosol.toolbox.protocol.labyrinth.LabyrinthOperationResult
 import com.landosol.toolbox.protocol.labyrinth.LabyrinthRoute
 import com.landosol.toolbox.protocol.labyrinth.LabyrinthTop
@@ -88,12 +89,14 @@ data class LabyrinthRouteJson(
     val currentBlockId: Long? = null,
     val routeEvaluationMode: String = LabyrinthRouteEvaluationMode.LEGACY_TEMPLATE.name,
     val valueAllowance: Int = 0,
+    val openingRelics: LabyrinthOpeningRelicState? = null,
 ) {
     val blockIds: List<Long> get() = nodes.map(LabyrinthNodeJson::blockId)
 
     fun toLabyrinthRoute(): LabyrinthRoute = LabyrinthRoute(
         enterId = enterId,
         nodes = nodes.map { it.toLabyrinthMapNode() },
+        openingRelics = openingRelics?.takeIf { it.guildId == guildId },
     )
 
     fun toFullMap(): List<LabyrinthMapNode> = allNodes.map { it.toLabyrinthMapNode() }
@@ -109,6 +112,10 @@ fun LabyrinthNodeJson.toLabyrinthMapNode(): LabyrinthMapNode = LabyrinthMapNode(
     nextBlockIds = nextBlockIds,
     isAreaLastPoint = isAreaLastPoint,
 )
+
+/** Missing legacy metadata is unknown; re-reading the current run supplies it without guessing. */
+internal fun LabyrinthRouteJson.openingRelicState(): LabyrinthOpeningRelicState? =
+    openingRelics?.takeIf { it.guildId == guildId }
 
 interface LabyrinthRouteStore {
     suspend fun save(
@@ -295,6 +302,7 @@ class RoomLabyrinthRouteStore(
             currentBlockId = currentBlockId,
             routeEvaluationMode = config.routePolicy.evaluationMode.name,
             valueAllowance = config.routePolicy.valueAllowance,
+            openingRelics = route.openingRelics?.takeIf { it.guildId == config.guildId },
         )
         database.labyrinthRouteDao().insert(
             LabyrinthRouteEntity(
@@ -409,7 +417,9 @@ class ExistingLabyrinthRouteResolver(
                 ) {
                     is RouteSearchResult.Found -> ExistingLabyrinthRouteResult.Found(
                         ResolvedLabyrinthRoute(
-                            route = search.route,
+                            route = search.route.copy(openingRelics = (value.guildId ?: top.guildId)?.let {
+                                LabyrinthOpeningRelicState(it, top.enhanceNodeIds)
+                            }),
                             allNodes = value.map,
                             currentBlockId = value.currentBlockId,
                             guildId = value.guildId ?: top.guildId,
@@ -454,9 +464,11 @@ class LabyrinthRerollWorkflow(
         }
 
         onProgress(progress(config, 0, "检查当前黎明界状态"))
+        var openingRelicState: LabyrinthOpeningRelicState? = null
         when (val top = readTopWithRetry(config, 0, "读取当前黎明界状态", onProgress)) {
             is LabyrinthOperationResult.Failure -> return LabyrinthRerollResult.Failure(top.message, top.kind)
             is LabyrinthOperationResult.Success -> {
+                openingRelicState = LabyrinthOpeningRelicState(config.guildId, top.value.enhanceNodeIds)
                 val existing = top.value.enterId
                 if (existing != null && config.abandonExisting) {
                     onProgress(progress(config, 0, "放弃现有开局（不复用）"))
@@ -665,8 +677,9 @@ class LabyrinthRerollWorkflow(
                     verdict = LabyrinthRouteVerdict.TARGET,
                     message = "当前开局符合目标路线",
                 )
-                routeStore.save(config, search.route, attempt, allNodes = entered.map)
-                return LabyrinthRerollResult.Success(search.route, attempt)
+                val route = search.route.copy(openingRelics = openingRelicState)
+                routeStore.save(config, route, attempt, allNodes = entered.map)
+                return LabyrinthRerollResult.Success(route, attempt)
             }
             saveCheckpoint(
                 config = config,

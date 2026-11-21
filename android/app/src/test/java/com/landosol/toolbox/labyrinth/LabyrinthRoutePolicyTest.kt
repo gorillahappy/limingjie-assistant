@@ -9,9 +9,10 @@ import org.junit.Test
 
 class LabyrinthRoutePolicyTest {
     @Test
-    fun `guild options and reroll defaults are stable`() {
-        assertEquals(listOf(1, 2, 3, 4, 5), LabyrinthRerollOptions.guilds.map { it.guildId })
-        assertEquals("拉比林斯", LabyrinthRerollOptions.guilds.last().name)
+    fun `ten guild options retain the original reroll defaults`() {
+        assertEquals((1..10).toList(), LabyrinthRerollOptions.guilds.map { it.guildId })
+        assertEquals("拉比林斯", LabyrinthRerollOptions.guilds[4].name)
+        assertEquals("暮光流星群", LabyrinthRerollOptions.guilds.last().name)
         assertEquals(1, LabyrinthRerollOptions.DEFAULT_GUILD_ID)
         assertEquals(5, LabyrinthRerollOptions.DEFAULT_DIFFICULTY)
         assertTrue(LabyrinthRerollOptions.DEFAULT_PERFECT_START)
